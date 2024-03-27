@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "poetry-aws-plugin"
+version = "0.1.0"
+description = ""
+authors = ["Song Huang <xiasongh@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+boto3 = "^1.34.71"
+poetry = "^1.8.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
