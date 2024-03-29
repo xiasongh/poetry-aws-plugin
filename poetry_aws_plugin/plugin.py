@@ -15,6 +15,7 @@ from poetry.utils.password_manager import HTTPAuthCredential
 
 POETRY_AWS_PLUGIN_ROLE_ARN_VAR = "POETRY_AWS_PLUGIN_ROLE_ARN"
 POETRY_AWS_PLUGIN_SESSION_NAME = "poetry-aws-plugin"
+POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR = "POETRY_AWS_PLUGIN_AUTH_TOKEN"
 
 UNAUTHORIZED_STATUS_CODES = (401, 403)
 CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.[^.]+\.amazonaws\.com/.*$"
@@ -100,6 +101,9 @@ def patch(io: IO):
             )
             raise err
 
+    def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
+        return os.environ.get(POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR, "")
+
     def get_auth_token(domain: str, domain_owner: str) -> str:
         io.write_line(
             "\nGetting new CodeArtifact authorization token for "
@@ -114,6 +118,7 @@ def patch(io: IO):
         methods = [
             get_auth_token_with_current_credentials,
             get_auth_token_with_iam_role,
+            get_auth_token_from_env,
         ]
         for method in methods:
             auth_token = method(domain, domain_owner)

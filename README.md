@@ -50,3 +50,7 @@ poetry install
 ```
 
 You can find more details in AWS's [CodeArtifact authentication and tokens documentation](https://docs.aws.amazon.com/codeartifact/latest/ug/tokens-authentication.html) and [CodeArtifact IAM documentation](https://docs.aws.amazon.com/codeartifact/latest/ug/security_iam_service-with-iam.html).
+
+# Misc
+
+You can also authorize by setting the environment variable `POETRY_AWS_PLUGIN_AUTH_TOKEN` to the CodeArtifact authorization token.
