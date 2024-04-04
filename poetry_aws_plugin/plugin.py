@@ -6,7 +6,7 @@ import boto3
 import requests
 
 from botocore.exceptions import ClientError
-from cleo.io.io import IO
+from cleo.io.io import IO, Verbosity
 from poetry.exceptions import PoetryException
 from poetry.plugins import Plugin
 from poetry.poetry import Poetry
@@ -60,7 +60,10 @@ def patch(io: IO):
             )
             return token_response["authorizationToken"]
         except ClientError as err:
-            io.write_line(f"\nError getting CodeArtifact token using current credentials: {err}\n")
+            io.write_line(
+                f"\nError getting CodeArtifact token using current credentials: {err}\n",
+                verbosity=Verbosity.VERBOSE,
+            )
             return ""
         except Exception as err:
             io.write_line("Unexpected error while getting CodeArtifact authorization token")
@@ -71,7 +74,8 @@ def patch(io: IO):
         if not role_arn:
             io.write_line(
                 f"\nError getting CodeArtifact token using IAM role: "
-                f"Environment variable '{POETRY_AWS_PLUGIN_ROLE_ARN_VAR}' not found\n"
+                f"Environment variable '{POETRY_AWS_PLUGIN_ROLE_ARN_VAR}' not found\n",
+                verbosity=Verbosity.VERBOSE,
             )
             return ""
 
@@ -93,7 +97,10 @@ def patch(io: IO):
             )
             return token_response["authorizationToken"]
         except ClientError as err:
-            io.write_line(f"\nError getting CodeArtifact token using IAM role '{role_arn}': {err}\n")
+            io.write_line(
+                f"\nError getting CodeArtifact token using IAM role '{role_arn}': {err}\n",
+                verbosity=Verbosity.VERBOSE,
+            )
             return ""
         except Exception as err:
             io.write_line(
@@ -107,7 +114,8 @@ def patch(io: IO):
     def get_auth_token(domain: str, domain_owner: str) -> str:
         io.write_line(
             "\nGetting new CodeArtifact authorization token for "
-            f"domain '{domain}' and domain owner '{domain_owner}'\n"
+            f"domain '{domain}' and domain owner '{domain_owner}'\n",
+            verbosity=Verbosity.VERBOSE,
         )
 
         is_valid = validate_credentials()
@@ -146,7 +154,10 @@ def patch(io: IO):
             if not auth_token:
                 raise PoetryException(RETRY_ERROR_MESSAGE)
 
-            io.write_line("\nSuccessfully got CodeArtifact authorization token!\n\nRetrying request...\n")
+            io.write_line(
+                "\nSuccessfully got CodeArtifact authorization token!\n\nRetrying request...\n",
+                verbosity=Verbosity.VERBOSE,
+            )
 
             # Overwrite the credentials for this URL
             self._credentials[url] = HTTPAuthCredential(username="aws", password=auth_token)
