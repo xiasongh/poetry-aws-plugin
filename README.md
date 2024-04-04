@@ -2,6 +2,8 @@
 
 This is a poetry plugin to help with AWS CodeArtifact authorization by automatically getting the authorization token.
 
+When installing or publishing packages through poetry and running into a CodeArtifact-related authorization error, the plugin will automatically get the authorization token and retry the command.
+
 The plugin will try two methods of authorization, in this order:
 
 1. Use AWS credentials to run `codeartifact.GetAuthorizationToken`.
@@ -53,4 +55,4 @@ You can find more details in AWS's [CodeArtifact authentication and tokens docum
 
 # Misc
 
-You can also authorize by setting the environment variable `POETRY_AWS_PLUGIN_AUTH_TOKEN` to the CodeArtifact authorization token.
+You can also authorize by setting the environment variable `POETRY_AWS_PLUGIN_AUTH_TOKEN` to the CodeArtifact authorization token. This may be useful in CI/CD pipelines and reduce poetry configuration.
