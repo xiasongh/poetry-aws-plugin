@@ -49,7 +49,8 @@ def patch(io: IO):
             io.write_line(f"\nError using current credentials: {err}\n")
             return False
         except Exception as err:
-            io.write_line("Unexpected error while validating AWS credentials")
+            io.write_line("Unexpected error while validating AWS credentials\n")
+            io.write_line(RETRY_ERROR_MESSAGE)
             raise err
 
     def get_auth_token_with_current_credentials(domain: str, domain_owner: str) -> str:
@@ -66,7 +67,8 @@ def patch(io: IO):
             )
             return ""
         except Exception as err:
-            io.write_line("Unexpected error while getting CodeArtifact authorization token")
+            io.write_line("Unexpected error while getting CodeArtifact authorization token\n")
+            io.write_line(RETRY_ERROR_MESSAGE)
             raise err
 
     def get_auth_token_with_iam_role(domain: str, domain_owner: str) -> str:
@@ -104,8 +106,9 @@ def patch(io: IO):
             return ""
         except Exception as err:
             io.write_line(
-                "Unexpected error while assuming CodeArtifact role and getting CodeArtifact authorization token"
+                "Unexpected error while assuming CodeArtifact role and getting CodeArtifact authorization token\n"
             )
+            io.write_line(RETRY_ERROR_MESSAGE)
             raise err
 
     def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
