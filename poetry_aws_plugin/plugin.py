@@ -145,7 +145,10 @@ def patch(io: IO):
         response = request(self, method=method, url=url, raise_for_status=False, **kwargs)
 
         if is_retryable(response):
-            io.write_line("\nFailed to get authorization for CodeArtifact\n")
+            io.write_line(
+                "\nFailed to get authorization for CodeArtifact\n",
+                verbosity=Verbosity.VERBOSE,
+            )
 
             match = re.match(CODEARTIFACT_URL_REGEX, response.url)
             domain, domain_owner = match.groups()
