@@ -20,14 +20,13 @@ POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR = "POETRY_AWS_PLUGIN_AUTH_TOKEN"
 UNAUTHORIZED_STATUS_CODES = (401, 403)
 CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.[^.]+\.amazonaws\.com/.*$"
 
-RETRY_ERROR_MESSAGE = f"""\
+RETRY_ERROR_MESSAGE = f"""
 Make sure you have AWS credentials configured and up-to-date
 
 Then make sure you have atleast one of the following:
     1. Authorization for CodeArtifact with your current credentials
     2. Authorization for an IAM role that has access to CodeArtifact and
        environment variable '{POETRY_AWS_PLUGIN_ROLE_ARN_VAR}' set to that role's ARN
-
 """
 
 
@@ -46,10 +45,10 @@ def patch(io: IO):
             boto3.client("sts").get_caller_identity()
             return True
         except ClientError as err:
-            io.write_line(f"\nError using current credentials: {err}\n")
+            io.write_line(f"Error using current credentials: {err}")
             return False
         except Exception as err:
-            io.write_line("Unexpected error while validating AWS credentials\n")
+            io.write_line("Unexpected error while validating AWS credentials")
             io.write_line(RETRY_ERROR_MESSAGE)
             raise err
 
@@ -62,21 +61,22 @@ def patch(io: IO):
             return token_response["authorizationToken"]
         except ClientError as err:
             io.write_line(
-                f"\nError getting CodeArtifact token using current credentials: {err}\n",
+                f"Error getting CodeArtifact token using current credentials: {err}",
                 verbosity=Verbosity.VERBOSE,
             )
-            return ""
         except Exception as err:
-            io.write_line("Unexpected error while getting CodeArtifact authorization token\n")
-            io.write_line(RETRY_ERROR_MESSAGE)
-            raise err
+            io.write_line(
+                f"Unexpected error while getting CodeArtifact authorization token: {err}",
+                verbosity=Verbosity.VERBOSE,
+            )
+        return ""
 
     def get_auth_token_with_iam_role(domain: str, domain_owner: str) -> str:
         role_arn = os.environ.get(POETRY_AWS_PLUGIN_ROLE_ARN_VAR)
         if not role_arn:
             io.write_line(
-                f"\nError getting CodeArtifact token using IAM role: "
-                f"Environment variable '{POETRY_AWS_PLUGIN_ROLE_ARN_VAR}' not found\n",
+                f"Error getting CodeArtifact token using IAM role: "
+                f"Environment variable '{POETRY_AWS_PLUGIN_ROLE_ARN_VAR}' not found",
                 verbosity=Verbosity.VERBOSE,
             )
             return ""
@@ -100,24 +100,24 @@ def patch(io: IO):
             return token_response["authorizationToken"]
         except ClientError as err:
             io.write_line(
-                f"\nError getting CodeArtifact token using IAM role '{role_arn}': {err}\n",
+                f"Error getting CodeArtifact token using IAM role '{role_arn}': {err}",
                 verbosity=Verbosity.VERBOSE,
             )
-            return ""
         except Exception as err:
             io.write_line(
-                "Unexpected error while assuming CodeArtifact role and getting CodeArtifact authorization token\n"
+                "Unexpected error while assuming CodeArtifact role "
+                f"and getting CodeArtifact authorization token: {err}",
+                verbosity=Verbosity.VERBOSE,
             )
-            io.write_line(RETRY_ERROR_MESSAGE)
-            raise err
+        return ""
 
     def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
         return os.environ.get(POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR, "")
 
     def get_auth_token(domain: str, domain_owner: str) -> str:
         io.write_line(
-            "\nGetting new CodeArtifact authorization token for "
-            f"domain '{domain}' and domain owner '{domain_owner}'\n",
+            "Getting new CodeArtifact authorization token for "
+            f"domain '{domain}' and domain owner '{domain_owner}'",
             verbosity=Verbosity.VERBOSE,
         )
 
@@ -149,7 +149,7 @@ def patch(io: IO):
 
         if is_retryable(response):
             io.write_line(
-                "\nFailed to get authorization for CodeArtifact\n",
+                "Failed to get authorization for CodeArtifact",
                 verbosity=Verbosity.VERBOSE,
             )
 
@@ -161,7 +161,7 @@ def patch(io: IO):
                 raise PoetryException(RETRY_ERROR_MESSAGE)
 
             io.write_line(
-                "\nSuccessfully got CodeArtifact authorization token!\n\nRetrying request...\n",
+                "Successfully got CodeArtifact authorization token! Retrying request...",
                 verbosity=Verbosity.VERBOSE,
             )
 
