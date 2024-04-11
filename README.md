@@ -32,15 +32,14 @@ When poetry runs a command that uses CodeArtifact and fails to authorize, the pl
 Your AWS credentials must be authorized to do atleast one of the following:
 
 1. Run [`codeartifact.GetAuthorizationToken`](https://docs.aws.amazon.com/cli/latest/reference/codeartifact/get-authorization-token.html).
-2. Run [`sts.AssumeRole`](https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html) to assume a role with authorization to run `codeartifact.GetAuthorizationToken`.
+2. Run [`sts.AssumeRole`](https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html) to assume a role with authorization to run [`codeartifact.GetAuthorizationToken`](https://docs.aws.amazon.com/cli/latest/reference/codeartifact/get-authorization-token.html).
 
 **To use IAM roles to authorize, set the environment variable `POETRY_AWS_PLUGIN_ROLE_ARN` to the role's ARN before running any poetry commands**.
 
 For example:
 
 ```bash
-export POETRY_AWS_PLUGIN_ROLE_ARN='arn:aws:codeartifact:<region>:<account-id>:repository/<domain>/<domain-owner>/<repository>'
-poetry install
+POETRY_AWS_PLUGIN_ROLE_ARN='arn:aws:codeartifact:<region>:<account-id>:repository/<domain>/<domain-owner>/<repository>' poetry install
 ```
 
 or
@@ -55,4 +54,10 @@ You can find more details in AWS's [CodeArtifact authentication and tokens docum
 
 # Misc
 
-You can also authorize by setting the environment variable `POETRY_AWS_PLUGIN_AUTH_TOKEN` to the CodeArtifact authorization token. This may be useful in CI/CD pipelines and reduce poetry configuration.
+You can also authorize by setting the environment variable `POETRY_AWS_PLUGIN_AUTH_TOKEN` to the CodeArtifact authorization token. This may be useful in CI/CD pipelines and reducing poetry configuration.
+
+For example:
+
+```bash
+POETRY_AWS_PLUGIN_AUTH_TOKEN='<codeartifact-authorization-token>' poetry install
+```
