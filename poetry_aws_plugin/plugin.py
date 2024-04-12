@@ -8,17 +8,17 @@ import requests
 from botocore.exceptions import ClientError
 from cleo.io.io import IO, Verbosity
 from poetry.exceptions import PoetryException
-from poetry.plugins import Plugin
 from poetry.poetry import Poetry
+from poetry.plugins import Plugin
+from poetry.publishing.uploader import Uploader
 from poetry.utils.authenticator import Authenticator
-from poetry.utils.password_manager import HTTPAuthCredential
 
 POETRY_AWS_PLUGIN_ROLE_ARN_VAR = "POETRY_AWS_PLUGIN_ROLE_ARN"
 POETRY_AWS_PLUGIN_SESSION_NAME = "poetry-aws-plugin"
 POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR = "POETRY_AWS_PLUGIN_AUTH_TOKEN"
 
 UNAUTHORIZED_STATUS_CODES = (401, 403)
-CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.[^.]+\.amazonaws\.com/.*$"
+CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.[^.]+\.amazonaws\.com.*$"
 
 RETRY_ERROR_MESSAGE = f"""
 Make sure you have AWS credentials configured and up-to-date
@@ -31,7 +31,6 @@ Then make sure you have atleast one of the following:
 
 
 def patch(io: IO):
-    request = Authenticator.request
 
     def is_retryable(response: requests.Response) -> bool:
         if response.status_code not in UNAUTHORIZED_STATUS_CODES:
@@ -39,6 +38,32 @@ def patch(io: IO):
         if not re.match(CODEARTIFACT_URL_REGEX, response.url):
             return False
         return True
+
+
+    def get_auth_token(domain: str, domain_owner: str) -> str:
+        io.write_line(
+            "Getting new CodeArtifact authorization token for "
+            f"domain '{domain}' and domain owner '{domain_owner}'",
+            verbosity=Verbosity.VERBOSE,
+        )
+
+        is_valid = validate_credentials()
+        if not is_valid:
+            return ""
+
+        # We'll try these methods to get the CodeArtifact token
+        methods = [
+            get_auth_token_with_current_credentials,
+            get_auth_token_with_iam_role,
+            get_auth_token_from_env,
+        ]
+        for method in methods:
+            auth_token = method(domain, domain_owner)
+            if auth_token:
+                return auth_token
+
+        return ""
+
 
     def validate_credentials() -> bool:
         try:
@@ -51,6 +76,7 @@ def patch(io: IO):
             io.write_line("Unexpected error while validating AWS credentials")
             io.write_line(RETRY_ERROR_MESSAGE)
             raise err
+
 
     def get_auth_token_with_current_credentials(domain: str, domain_owner: str) -> str:
         try:
@@ -70,6 +96,7 @@ def patch(io: IO):
                 verbosity=Verbosity.VERBOSE,
             )
         return ""
+
 
     def get_auth_token_with_iam_role(domain: str, domain_owner: str) -> str:
         role_arn = os.environ.get(POETRY_AWS_PLUGIN_ROLE_ARN_VAR)
@@ -111,71 +138,56 @@ def patch(io: IO):
             )
         return ""
 
+
     def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
         return os.environ.get(POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR, "")
 
-    def get_auth_token(domain: str, domain_owner: str) -> str:
+
+    def patched_session_send(self: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
+        response = requests.Session.send(self, request.copy(), **kwargs)
+        if not is_retryable(response):
+            return response
+
         io.write_line(
-            "Getting new CodeArtifact authorization token for "
-            f"domain '{domain}' and domain owner '{domain_owner}'",
+            "Failed to get authorization for CodeArtifact",
             verbosity=Verbosity.VERBOSE,
         )
 
-        is_valid = validate_credentials()
-        if not is_valid:
-            return ""
+        match = re.match(CODEARTIFACT_URL_REGEX, response.url)
+        domain, domain_owner = match.groups()
 
-        # We'll try these methods to get the CodeArtifact token
-        methods = [
-            get_auth_token_with_current_credentials,
-            get_auth_token_with_iam_role,
-            get_auth_token_from_env,
-        ]
-        for method in methods:
-            auth_token = method(domain, domain_owner)
-            if auth_token:
-                return auth_token
+        auth_token = get_auth_token(domain, domain_owner)
+        if not auth_token:
+            raise PoetryException(RETRY_ERROR_MESSAGE)
 
-        return ""
+        io.write_line("Successfully got CodeArtifact authorization token\nRetrying request", verbosity=Verbosity.VERBOSE)
 
-    def patched_request(
-        self: Authenticator,
-        method: str,
-        url: str,
-        raise_for_status: bool = True,
-        **kwargs: Any,
-    ) -> requests.Response:
-        response = request(self, method=method, url=url, raise_for_status=False, **kwargs)
+        # Use the received auth token for the session
+        self.auth = ("aws", auth_token)
 
-        if is_retryable(response):
-            io.write_line(
-                "Failed to get authorization for CodeArtifact",
-                verbosity=Verbosity.VERBOSE,
-            )
+        # And create a new request using the new auth
+        new_request = request.copy()
+        new_request.prepare_auth(self.auth, request.url)
 
-            match = re.match(CODEARTIFACT_URL_REGEX, response.url)
-            domain, domain_owner = match.groups()
+        # And finally we retry the request
+        return requests.Session.send(self, new_request, **kwargs)
 
-            auth_token = get_auth_token(domain, domain_owner)
-            if not auth_token:
-                raise PoetryException(RETRY_ERROR_MESSAGE)
 
-            io.write_line(
-                "Successfully got CodeArtifact authorization token! Retrying request...",
-                verbosity=Verbosity.VERBOSE,
-            )
+    def patched_authenticator_create_session(self: Authenticator) -> requests.Session:
+        session = authenticator_create_session(self)
+        session.send = patched_session_send.__get__(session)
+        return session
 
-            # Overwrite the credentials for this URL
-            self._credentials[url] = HTTPAuthCredential(username="aws", password=auth_token)
+    def patched_uploader_make_session(self: Uploader) -> requests.Session:
+        session = uploader_make_session(self)
+        session.send = patched_session_send.__get__(session)
+        return session
 
-            # Now retry the original request with new credentials
-            return request(self, method=method, url=url, raise_for_status=raise_for_status, **kwargs)
+    authenticator_create_session = Authenticator.create_session
+    uploader_make_session = Uploader.make_session
 
-        if raise_for_status:
-            response.raise_for_status()
-        return response
-
-    Authenticator.request = patched_request
+    Authenticator.create_session = patched_authenticator_create_session
+    Uploader.make_session = patched_uploader_make_session
 
 
 class PoetryAwsPlugin(Plugin):
