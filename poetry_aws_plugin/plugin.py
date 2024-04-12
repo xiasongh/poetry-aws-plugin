@@ -5,10 +5,8 @@ from typing import Any
 
 import boto3
 import requests
-from requests.utils import rewind_body
 
 from botocore.exceptions import ClientError
-from poetry.exceptions import PoetryException
 from poetry.plugins import Plugin
 from poetry.publishing.uploader import Uploader
 from poetry.utils.authenticator import Authenticator
@@ -17,10 +15,9 @@ POETRY_AWS_PLUGIN_ROLE_ARN_VAR = "POETRY_AWS_PLUGIN_ROLE_ARN"
 POETRY_AWS_PLUGIN_SESSION_NAME = "poetry-aws-plugin"
 POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR = "POETRY_AWS_PLUGIN_AUTH_TOKEN"
 
-UNAUTHORIZED_STATUS_CODES = (401, 403)
 CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.[^.]+\.amazonaws\.com.*$"
 
-RETRY_ERROR_MESSAGE = f"""
+AUTH_ERROR_MESSAGE = f"""
 Make sure you have AWS credentials configured and up-to-date
 
 Then make sure you have atleast one of the following:
@@ -36,10 +33,10 @@ authenticator_create_session = Authenticator.create_session
 uploader_make_session = Uploader.make_session
 
 
-def is_retryable(response: requests.Response) -> bool:
-    if response.status_code not in UNAUTHORIZED_STATUS_CODES:
+def requires_authorization(request: requests.PreparedRequest) -> bool:
+    if request.headers.get("Authorization", None):
         return False
-    if not re.match(CODEARTIFACT_URL_REGEX, response.url):
+    if not re.match(CODEARTIFACT_URL_REGEX, request.url):
         return False
     return True
 
@@ -74,8 +71,8 @@ def validate_credentials() -> bool:
         logger.debug(f"Error using current credentials: {err}")
         return False
     except Exception as err:
-        logger.debug(f"Unexpected error while validating AWS credentials\n{RETRY_ERROR_MESSAGE}")
-        raise err
+        logger.debug(f"Unexpected error while validating AWS credentials: {err}\n{AUTH_ERROR_MESSAGE}")
+        return False
 
 
 def get_auth_token_with_current_credentials(domain: str, domain_owner: str) -> str:
@@ -132,31 +129,27 @@ def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
 
 
 def patched_session_send(self: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
-    response = requests.Session.send(self, request.copy(), **kwargs.copy())
-    if not is_retryable(response):
-        return response
+    if not requires_authorization(request):
+        return requests.Session.send(self, request, **kwargs)
 
-    logger.debug("Failed to get authorization for CodeArtifact")
+    logger.debug("Adding CodeArtifact authorization to request")
 
-    match = re.match(CODEARTIFACT_URL_REGEX, response.url)
+    match = re.match(CODEARTIFACT_URL_REGEX, request.url)
     domain, domain_owner = match.groups()
 
     auth_token = get_auth_token(domain, domain_owner)
     if not auth_token:
-        raise PoetryException(RETRY_ERROR_MESSAGE)
+        logger.warning(AUTH_ERROR_MESSAGE)
+        # Try the request anyway
+        return requests.Session.send(self, request, **kwargs)
 
-    logger.debug("Successfully got CodeArtifact authorization token\nRetrying request")
+    logger.debug("Successfully got CodeArtifact authorization token")
 
-    # Use the received auth token for the session
+    # Add the auth to session and request
     self.auth = ("aws", auth_token)
+    request.prepare_auth(self.auth)
 
-    # And create a new request using the new auth
-    new_request = request.copy()
-    rewind_body(new_request)
-    new_request.prepare_auth(self.auth, request.url)
-
-    # And finally we retry the request
-    return requests.Session.send(self, new_request, **kwargs)
+    return requests.Session.send(self, request, **kwargs)
 
 
 def patched_authenticator_create_session(self: Authenticator) -> requests.Session:

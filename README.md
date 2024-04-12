@@ -2,7 +2,7 @@
 
 This is a poetry plugin to help with AWS CodeArtifact authorization by automatically getting the authorization token.
 
-When installing or publishing packages through poetry and running into a CodeArtifact-related authorization error, the plugin will automatically get the authorization token and retry the command.
+When installing or publishing packages through poetry, the plugin will check whether the command requires CodeArtifact authorization, and if so, adds it automatically.
 
 The plugin will try two methods of authorization, in this order:
 
@@ -27,7 +27,7 @@ poetry self remove poetry-aws-plugin
 
 You must ensure that your AWS credentials are configured and discoverable by `boto3`. The [`boto3` documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html#configuring-credentials) has details on how to configure your credentials and the order in which they searched.
 
-When poetry runs a command that uses CodeArtifact and fails to authorize, the plugin will automatically attempt to get the authorization token and retry the command.
+When poetry runs a command that uses CodeArtifact, the plugin will automatically check whether the command needs authorization, and if so, requests a CodeArtifact authorization token and adds it to the command.
 
 Your AWS credentials must be authorized to do atleast one of the following:
 
