@@ -5,6 +5,7 @@ from typing import Any
 
 import boto3
 import requests
+from requests.utils import rewind_body
 
 from botocore.exceptions import ClientError
 from poetry.exceptions import PoetryException
@@ -151,6 +152,7 @@ def patched_session_send(self: requests.Session, request: requests.PreparedReque
 
     # And create a new request using the new auth
     new_request = request.copy()
+    rewind_body(new_request)
     new_request.prepare_auth(self.auth, request.url)
 
     # And finally we retry the request
