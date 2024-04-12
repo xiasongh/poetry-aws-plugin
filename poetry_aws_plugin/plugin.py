@@ -131,7 +131,7 @@ def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
 
 
 def patched_session_send(self: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
-    response = requests.Session.send(self, request.copy(), **kwargs)
+    response = requests.Session.send(self, request.copy(), **kwargs.copy())
     if not is_retryable(response):
         return response
 
