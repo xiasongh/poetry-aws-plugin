@@ -7,6 +7,8 @@ import boto3
 import requests
 
 from botocore.exceptions import ClientError
+from cleo.io.io import IO
+from poetry.poetry import Poetry
 from poetry.plugins import Plugin
 from poetry.publishing.uploader import Uploader
 from poetry.utils.authenticator import Authenticator
@@ -52,9 +54,9 @@ def get_auth_token(domain: str, domain_owner: str) -> str:
 
     # We'll try these methods to get the CodeArtifact token
     methods = [
-        get_auth_token_with_current_credentials,
-        get_auth_token_with_iam_role,
         get_auth_token_from_env,
+        get_auth_token_with_iam_role,
+        get_auth_token_with_current_credentials,
     ]
     for method in methods:
         auth_token = method(domain, domain_owner)
@@ -165,6 +167,6 @@ def patched_uploader_make_session(self: Uploader) -> requests.Session:
 
 
 class PoetryAwsPlugin(Plugin):
-    def activate(self, *args: Any, **kwargs: Any) -> None:
+    def activate(self, poetry: Poetry, io: IO) -> None:
         Authenticator.create_session = patched_authenticator_create_session
         Uploader.make_session = patched_uploader_make_session

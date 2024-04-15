@@ -6,8 +6,8 @@ When installing or publishing packages through poetry, the plugin will check whe
 
 The plugin will try two methods of authorization, in this order:
 
-1. Use AWS credentials to run `codeartifact.GetAuthorizationToken`.
-2. Use AWS credentials to run `sts.AssumeRole`, then use that role to run `codeartifact.GetAuthorizationToken`.
+1. Use AWS credentials to run `sts.AssumeRole`, then use that role to run `codeartifact.GetAuthorizationToken`.
+2. Use AWS credentials to run `codeartifact.GetAuthorizationToken`.
 
 ## Installation
 
