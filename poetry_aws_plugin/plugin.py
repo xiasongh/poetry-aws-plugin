@@ -17,7 +17,7 @@ POETRY_AWS_PLUGIN_ROLE_ARN_VAR = "POETRY_AWS_PLUGIN_ROLE_ARN"
 POETRY_AWS_PLUGIN_SESSION_NAME = "poetry-aws-plugin"
 POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR = "POETRY_AWS_PLUGIN_AUTH_TOKEN"
 
-CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.[^.]+\.amazonaws\.com.*$"
+CODEARTIFACT_URL_REGEX = r"^https://([a-z][a-z-]*)-(\d+)\.d\.codeartifact\.([^.]+)\.amazonaws\.com.*$"
 
 AUTH_ERROR_MESSAGE = f"""
 Make sure you have AWS credentials configured and up-to-date
@@ -43,14 +43,15 @@ def patch(io: IO):
             return False
         return True
 
-    def get_auth_token(domain: str, domain_owner: str) -> str:
+    def get_auth_token(domain: str, domain_owner: str, region: str) -> str:
         # First check if user set the auth token in environment variables
         auth_token = get_auth_token_from_env()
         if auth_token:
             return auth_token
 
         logger.debug(
-            f"Getting new CodeArtifact authorization token for domain '{domain}' and domain owner '{domain_owner}'"
+            "Getting new CodeArtifact authorization token for "
+            f"region '{region}', domain '{domain}', and domain owner '{domain_owner}'"
         )
 
         is_valid = validate_credentials()
@@ -63,7 +64,7 @@ def patch(io: IO):
             get_auth_token_with_current_credentials,
         ]
         for method in methods:
-            auth_token = method(domain, domain_owner)
+            auth_token = method(domain, domain_owner, region)
             if auth_token:
                 return auth_token
         return ""
@@ -79,9 +80,9 @@ def patch(io: IO):
             logger.debug(f"Unexpected error while validating AWS credentials: {err}\n{AUTH_ERROR_MESSAGE}")
             return False
 
-    def get_auth_token_with_current_credentials(domain: str, domain_owner: str) -> str:
+    def get_auth_token_with_current_credentials(domain: str, domain_owner: str, region: str) -> str:
         try:
-            token_response = boto3.client("codeartifact").get_authorization_token(
+            token_response = boto3.client("codeartifact", region_name=region).get_authorization_token(
                 domain=domain,
                 domainOwner=domain_owner,
             )
@@ -93,7 +94,7 @@ def patch(io: IO):
         return ""
 
 
-    def get_auth_token_with_iam_role(domain: str, domain_owner: str) -> str:
+    def get_auth_token_with_iam_role(domain: str, domain_owner: str, region: str) -> str:
         role_arn = os.environ.get(POETRY_AWS_PLUGIN_ROLE_ARN_VAR)
         if not role_arn:
             logger.debug(
@@ -114,7 +115,7 @@ def patch(io: IO):
                 aws_session_token=credentials["SessionToken"],
             )
 
-            token_response = session.client("codeartifact").get_authorization_token(
+            token_response = session.client("codeartifact", region_name=region).get_authorization_token(
                 domain=domain,
                 domainOwner=domain_owner,
             )
@@ -137,9 +138,9 @@ def patch(io: IO):
         logger.debug("Adding CodeArtifact authorization to request")
 
         match = re.match(CODEARTIFACT_URL_REGEX, request.url)
-        domain, domain_owner = match.groups()
+        domain, domain_owner, region = match.groups()
 
-        auth_token = get_auth_token(domain, domain_owner)
+        auth_token = get_auth_token(domain, domain_owner, region)
         if not auth_token:
             logger.error(AUTH_ERROR_MESSAGE)
             io.write_line(f"<error>{AUTH_ERROR_MESSAGE}</>")
