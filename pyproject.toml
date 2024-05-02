@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "poetry-aws-plugin"
-version = "0.1.10"
+version = "0.1.11"
 description = "A poetry plugin to help with AWS CodeArtifact authorization automatically"
 license = "MIT"
 authors = ["Song Huang <xiasongh@gmail.com>"]

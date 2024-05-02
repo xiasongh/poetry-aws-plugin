@@ -44,6 +44,11 @@ def patch(io: IO):
         return True
 
     def get_auth_token(domain: str, domain_owner: str) -> str:
+        # First check if user set the auth token in environment variables
+        auth_token = get_auth_token_from_env()
+        if auth_token:
+            return auth_token
+
         logger.debug(
             f"Getting new CodeArtifact authorization token for domain '{domain}' and domain owner '{domain_owner}'"
         )
@@ -54,7 +59,6 @@ def patch(io: IO):
 
         # We'll try these methods to get the CodeArtifact token
         methods = [
-            get_auth_token_from_env,
             get_auth_token_with_iam_role,
             get_auth_token_with_current_credentials,
         ]
@@ -123,7 +127,7 @@ def patch(io: IO):
             )
         return ""
 
-    def get_auth_token_from_env(*args: Any, **kwargs: Any) -> str:
+    def get_auth_token_from_env() -> str:
         return os.environ.get(POETRY_AWS_PLUGIN_AUTH_TOKEN_VAR, "")
 
     def patched_session_send(self: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
